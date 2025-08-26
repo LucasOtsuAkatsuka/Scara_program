@@ -22,3 +22,10 @@ void Garra::descer()
 {
    servo.write(angleDown);
 }
+
+float Garra::distancia()
+{
+   microseg = ultrasonic.timing();
+   distancia = ultrasonic.convert(microseg, Ultrasonic::CM);
+   return distancia;
+}

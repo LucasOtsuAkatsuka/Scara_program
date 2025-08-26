@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "Garra.h"
+#include "Cinematica.h"
 
 Garra garra;
 
@@ -13,9 +14,14 @@ Garra garra;
 #define DEF_DIR22  14
 #define DEF_STEP22 15
 
+Cinematica braco1(DEF_STEP11, DEF_DIR11, DEF_STEP12, DEF_DIR12, DEF_EN);
+
 void setup() {
-    Serial.begin(9600);
+   Serial.begin(9600);
    garra.begin(pinControlServo_1, pinTRIG, pinECHO);
+   braco1.begin(true);
+   
+   braco1.goToIndex(4);
 }
 
 void loop() {

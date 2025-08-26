@@ -1,7 +1,6 @@
 #pragma once
 #include <Arduino.h>
 #include <AccelStepper.h>
-#include <map>
 
 struct Coord { float x, y; };
 
@@ -74,7 +73,9 @@ private:
   float accel_     = DEF_ACCEL_STEPS_S2;
   bool inv_dir1_ = false, inv_dir2_ = false;
 
-  std::map<int, Coord> points_;
+  //std::map<int, Coord> points_;
+
+  Coord points_[11];
 
   bool  solveIK(float x, float y, float& th1_deg_out, float& th2_deg_out);
   long  degToSteps(float deg) const;

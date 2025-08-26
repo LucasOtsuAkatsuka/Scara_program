@@ -41,12 +41,12 @@ void Cinematica::enableDriver(bool enable) {
 
 // =================== MOVIMENTO (bloqueante) ===================
 bool Cinematica::goToIndex(uint8_t idx) {
-  auto it = points_.find(idx);
-  if (it == points_.end()) {
-    Serial.println(F("[SCARA] Índice não encontrado (1..10)."));
+  if (idx < 1 || idx > 10) {
+    Serial.println(F("[SCARA] Índice inválido (use 1..10)."));
     return false;
   }
-  return goToXY(it->second.x, it->second.y);
+  const Coord c = points_[idx];
+  return goToXY(c.x, c.y);
 }
 
 bool Cinematica::goToXY(float x_mm, float y_mm) {
@@ -179,17 +179,16 @@ void Cinematica::setOrigin() {
 }
 
 void Cinematica::loadDefaultPoints() {
-  points_.clear();
-  points_[1]  = { 300.0f,     0.0f };
-  points_[2]  = { 320.0f,   -50.0f };
-  points_[3]  = { 280.0f,    80.0f };
-  points_[4]  = { 250.0f,  -120.0f };
-  points_[5]  = { 350.0f,    30.0f };
-  points_[6]  = { 200.0f,   150.0f };
-  points_[7]  = { 200.0f,  -150.0f };
-  points_[8]  = { 380.0f,   -10.0f };
-  points_[9]  = { 260.0f,    40.0f };
-  points_[10] = { 385.95f, -183.37f };
+  points_[1]  = { 50.0f,   188.0f };
+  points_[2]  = { 48.0f,   252.0f };
+  points_[3]  = { 47.0f,   319.0f };
+  points_[4]  = { 82.0f,   376.0f };
+  points_[5]  = { 146.0f,  400.0f };
+  points_[6]  = { 200.0f,  150.0f };
+  points_[7]  = { 200.0f, -150.0f };
+  points_[8]  = { 380.0f,  -10.0f };
+  points_[9]  = { 260.0f,   40.0f };
+  points_[10] = { 385.95f,-183.37f };
 }
 
 //void Cinematica::setMicrostepDivider(uint8_t divider) {

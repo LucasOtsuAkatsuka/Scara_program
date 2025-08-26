@@ -25,7 +25,7 @@ public:
 private:
     Servo servo;
     Ultrasonic ultrasonic = Ultrasonic(pinTRIG, pinECHO);
-    float distancia;
+    float _distancia;
     long microseg;
 };
 

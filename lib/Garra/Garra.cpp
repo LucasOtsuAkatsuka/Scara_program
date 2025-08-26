@@ -25,7 +25,6 @@ void Garra::descer()
 
 float Garra::distancia()
 {
-   microseg = ultrasonic.timing();
-   distancia = ultrasonic.convert(microseg, Ultrasonic::CM);
-   return distancia;
+   _distancia = ultrasonic.read();
+   return _distancia;
 }

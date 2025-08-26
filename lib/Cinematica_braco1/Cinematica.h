@@ -16,17 +16,12 @@ public:
   static constexpr float DEF_TH2_MAX =  135.0f;
 
   static constexpr float   DEF_MOTOR_STEP_DEG = 1.8f;
-  static constexpr uint8_t DEF_MICROSTEP_DIV  = 16;   // amarrado em 5V
+  static constexpr uint8_t DEF_MICROSTEP_DIV  = 16; 
   static constexpr unsigned int DEF_DIR_SETUP_US = 2;
 
-  // Parâmetros AccelStepper
   static constexpr float DEF_MAX_SPEED_STEPS_S = 500.0f;
   static constexpr float DEF_ACCEL_STEPS_S2    = 200.0f;
 
-  // ====== CONSTRUTORES ======
-
-
-  // Construtor com pinos (step1, dir1, step2, dir2, en)
   Cinematica(int step1, int dir1, int step2, int dir2, int enPin = -1);
 
   void begin(bool enable = true);
@@ -37,6 +32,8 @@ public:
   bool goToXY(float x_mm, float y_mm);
 
   void moveSteps(uint8_t joint, long steps);
+
+  void setOrigin();
 
   void setCurrentAnglesDeg(float th1_deg, float th2_deg);
   //void setMicrostepDivider(uint8_t divider);
@@ -56,7 +53,7 @@ public:
   float currentTheta2Deg()   const { return pos2_steps_ * step_eff_deg_; }
 
 private:
-  // Pinos (definidos via construtor/setPins)
+
   int STEP1_ = -1, DIR1_ = -1;
   int STEP2_ = -1, DIR2_ = -1;
   int EN_    = -1;

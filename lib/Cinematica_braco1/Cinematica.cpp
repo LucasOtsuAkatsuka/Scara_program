@@ -166,6 +166,18 @@ void Cinematica::moveSteps(uint8_t joint, long steps) {
   }
 }
 
+void Cinematica::setOrigin() {
+  if (m1_) {
+    m1_->setCurrentPosition(0);
+    pos1_steps_ = 0;              
+  }
+  if (m2_) {
+    m2_->setCurrentPosition(0);
+    pos2_steps_ = 0;
+  }
+  Serial.println(F("[SCARA] Origem redefinida em (0,0)."));
+}
+
 void Cinematica::loadDefaultPoints() {
   points_.clear();
   points_[1]  = { 300.0f,     0.0f };

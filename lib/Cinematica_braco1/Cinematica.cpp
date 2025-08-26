@@ -2,42 +2,41 @@
 #include <math.h>
 
 // =================== CONSTRUTOR ===================
-Cinematica::Cinematica() {
+Cinematica::Cinematica(int step1, int dir1, int step2, int dir2, int enPin) {
+  STEP1_ = step1;
+  DIR1_  = dir1;
+  STEP2_ = step2;
+  DIR2_  = dir2;
+  EN_    = enPin;
   step_eff_deg_ = motor_step_deg_ / (float)microstep_div_;
   loadDefaultPoints();
 }
 
 // =================== BEGIN / ENABLE ===================
 void Cinematica::begin(bool enable) {
-  // Pinos DIR/STEP
   pinMode(DIR1_, OUTPUT);  pinMode(STEP1_, OUTPUT);
   pinMode(DIR2_, OUTPUT);  pinMode(STEP2_, OUTPUT);
 
-  // ENABLE (A4988: LOW = habilita)
   if (EN_ >= 0) { pinMode(EN_, OUTPUT); enableDriver(enable); }
 
-  // Cria os AccelStepper como interface DRIVER (DIR/STEP)
   m1_ = new AccelStepper(AccelStepper::DRIVER, STEP1_, DIR1_);
   m2_ = new AccelStepper(AccelStepper::DRIVER, STEP2_, DIR2_);
 
-  // Inverte sentido se solicitado
   m1_->setPinsInverted(inv_dir1_, false, false);
   m2_->setPinsInverted(inv_dir2_, false, false);
 
-  // Velocidade/aceleração padrão
   m1_->setMaxSpeed(max_speed_);
   m1_->setAcceleration(accel_);
   m2_->setMaxSpeed(max_speed_);
   m2_->setAcceleration(accel_);
 
-  // Garante que posição interna do AccelStepper bate com pos*_steps_
   m1_->setCurrentPosition(pos1_steps_);
   m2_->setCurrentPosition(pos2_steps_);
 }
 
 void Cinematica::enableDriver(bool enable) {
   if (EN_ < 0) return;
-  digitalWrite(EN_, enable ? LOW : HIGH); // LOW = habilita (A4988)
+  digitalWrite(EN_, enable ? LOW : HIGH);
 }
 
 // =================== MOVIMENTO (bloqueante) ===================
@@ -73,46 +72,6 @@ void Cinematica::setCurrentAnglesDeg(float th1_deg, float th2_deg) {
   pos2_steps_ = degToSteps(th2_deg);
   if (m1_) m1_->setCurrentPosition(pos1_steps_);
   if (m2_) m2_->setCurrentPosition(pos2_steps_);
-}
-
-void Cinematica::setMicrostepDivider(uint8_t divider) {
-  microstep_div_ = divider ? divider : 1;
-  step_eff_deg_  = motor_step_deg_ / (float)microstep_div_;
-}
-
-void Cinematica::setPins(int step1, int dir1, int step2, int dir2, int enPin) {
-  STEP1_ = step1; DIR1_ = dir1; STEP2_ = step2; DIR2_ = dir2; EN_ = enPin;
-}
-
-void Cinematica::setGeometry(float L1_mm, float L2_mm) {
-  L1_ = L1_mm; L2_ = L2_mm;
-}
-
-void Cinematica::setLimits(float th1_min, float th1_max, float th2_min, float th2_max) {
-  th1_min_ = th1_min; th1_max_ = th1_max;
-  th2_min_ = th2_min; th2_max_ = th2_max;
-}
-
-void Cinematica::setMotorStep(float motor_step_deg) {
-  motor_step_deg_ = motor_step_deg;
-  step_eff_deg_   = motor_step_deg_ / (float)microstep_div_;
-}
-
-void Cinematica::setMapPoint(uint8_t idx, float x_mm, float y_mm) {
-  if (idx < 1 || idx > 10) return;
-  points_[idx] = {x_mm, y_mm};
-}
-
-void Cinematica::setMaxSpeed(float steps_per_s) {
-  max_speed_ = steps_per_s;
-  if (m1_) m1_->setMaxSpeed(max_speed_);
-  if (m2_) m2_->setMaxSpeed(max_speed_);
-}
-
-void Cinematica::setAcceleration(float steps_per_s2) {
-  accel_ = steps_per_s2;
-  if (m1_) m1_->setAcceleration(accel_);
-  if (m2_) m2_->setAcceleration(accel_);
 }
 
 void Cinematica::invertDir(bool joint1_invert, bool joint2_invert) {
@@ -185,6 +144,28 @@ bool Cinematica::inRange(float v, float vmin, float vmax) {
   return (v >= vmin) && (v <= vmax);
 }
 
+
+void Cinematica::moveSteps(uint8_t joint, long steps) {
+  if (!m1_ || !m2_) return;
+
+  if (joint == 1) {
+    long target = pos1_steps_ + steps;
+    m1_->moveTo(target);
+    while (m1_->distanceToGo() != 0) {
+      m1_->run();
+    }
+    pos1_steps_ = m1_->currentPosition();
+  }
+  else if (joint == 2) {
+    long target = pos2_steps_ + steps;
+    m2_->moveTo(target);
+    while (m2_->distanceToGo() != 0) {
+      m2_->run();
+    }
+    pos2_steps_ = m2_->currentPosition();
+  }
+}
+
 void Cinematica::loadDefaultPoints() {
   points_.clear();
   points_[1]  = { 300.0f,     0.0f };
@@ -198,3 +179,43 @@ void Cinematica::loadDefaultPoints() {
   points_[9]  = { 260.0f,    40.0f };
   points_[10] = { 385.95f, -183.37f };
 }
+
+//void Cinematica::setMicrostepDivider(uint8_t divider) {
+//  microstep_div_ = divider ? divider : 1;
+//  step_eff_deg_  = motor_step_deg_ / (float)microstep_div_;
+//}
+//
+//void Cinematica::setPins(int step1, int dir1, int step2, int dir2, int enPin) {
+//  STEP1_ = step1; DIR1_ = dir1; STEP2_ = step2; DIR2_ = dir2; EN_ = enPin;
+//}
+//
+//void Cinematica::setGeometry(float L1_mm, float L2_mm) {
+//  L1_ = L1_mm; L2_ = L2_mm;
+//}
+//
+//void Cinematica::setLimits(float th1_min, float th1_max, float th2_min, float th2_max) {
+//  th1_min_ = th1_min; th1_max_ = th1_max;
+//  th2_min_ = th2_min; th2_max_ = th2_max;
+//}
+//
+//void Cinematica::setMotorStep(float motor_step_deg) {
+//  motor_step_deg_ = motor_step_deg;
+//  step_eff_deg_   = motor_step_deg_ / (float)microstep_div_;
+//}
+//
+//void Cinematica::setMapPoint(uint8_t idx, float x_mm, float y_mm) {
+//  if (idx < 1 || idx > 10) return;
+//  points_[idx] = {x_mm, y_mm};
+//}
+//
+//void Cinematica::setMaxSpeed(float steps_per_s) {
+//  max_speed_ = steps_per_s;
+//  if (m1_) m1_->setMaxSpeed(max_speed_);
+//  if (m2_) m2_->setMaxSpeed(max_speed_);
+//}
+//
+//void Cinematica::setAcceleration(float steps_per_s2) {
+//  accel_ = steps_per_s2;
+//  if (m1_) m1_->setAcceleration(accel_);
+//  if (m2_) m2_->setAcceleration(accel_);
+//}

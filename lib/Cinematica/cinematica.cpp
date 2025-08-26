@@ -1,44 +1,50 @@
 #include "Cinematica.h"
 #include <math.h>
 
-Cinematica::Cinematica(int stepPin1, int dirPin1,
-                                 int stepPin2, int dirPin2,
-                                 float L1_mm, float L2_mm,
-                                 float theta1_min_deg, float theta1_max_deg,
-                                 float theta2_min_deg, float theta2_max_deg,
-                                 float step_deg, float microstep,
-                                 unsigned int us_on, unsigned int us_off)
-: L1_(L1_mm), L2_(L2_mm),
-  th1_min_(theta1_min_deg), th1_max_(theta1_max_deg),
-  th2_min_(theta2_min_deg), th2_max_(theta2_max_deg),
-  STEP1_(stepPin1), DIR1_(dirPin1),
-  STEP2_(stepPin2), DIR2_(dirPin2),
-  step_deg_(step_deg), microstep_(microstep),
-  us_on_(us_on), us_off_(us_off)
-{
-  step_eff_deg_ = step_deg_ * microstep_;
+// =================== CONSTRUTOR ===================
+Cinematica::Cinematica() {
+  step_eff_deg_ = motor_step_deg_ / (float)microstep_div_;
+  loadDefaultPoints();
 }
 
-void Cinematica::begin() {
-  pinMode(DIR1_, OUTPUT);
-  pinMode(STEP1_, OUTPUT);
-  pinMode(DIR2_, OUTPUT);
-  pinMode(STEP2_, OUTPUT);
+// =================== BEGIN / ENABLE ===================
+void Cinematica::begin(bool enable) {
+  // Pinos DIR/STEP
+  pinMode(DIR1_, OUTPUT);  pinMode(STEP1_, OUTPUT);
+  pinMode(DIR2_, OUTPUT);  pinMode(STEP2_, OUTPUT);
+
+  // ENABLE (A4988: LOW = habilita)
+  if (EN_ >= 0) { pinMode(EN_, OUTPUT); enableDriver(enable); }
+
+  // Cria os AccelStepper como interface DRIVER (DIR/STEP)
+  m1_ = new AccelStepper(AccelStepper::DRIVER, STEP1_, DIR1_);
+  m2_ = new AccelStepper(AccelStepper::DRIVER, STEP2_, DIR2_);
+
+  // Inverte sentido se solicitado
+  m1_->setPinsInverted(inv_dir1_, false, false);
+  m2_->setPinsInverted(inv_dir2_, false, false);
+
+  // Velocidade/aceleração padrão
+  m1_->setMaxSpeed(max_speed_);
+  m1_->setAcceleration(accel_);
+  m2_->setMaxSpeed(max_speed_);
+  m2_->setAcceleration(accel_);
+
+  // Garante que posição interna do AccelStepper bate com pos*_steps_
+  m1_->setCurrentPosition(pos1_steps_);
+  m2_->setCurrentPosition(pos2_steps_);
 }
 
-void Cinematica::setPoint(uint8_t idx, float x_mm, float y_mm) {
-  if (idx < 1 || idx > 10) return;
-  points_[idx] = {x_mm, y_mm};
+void Cinematica::enableDriver(bool enable) {
+  if (EN_ < 0) return;
+  digitalWrite(EN_, enable ? LOW : HIGH); // LOW = habilita (A4988)
 }
 
-void Cinematica::setPointsMap(const std::map<int, Coord>& m) {
-  points_ = m;
-}
-
+// =================== MOVIMENTO (bloqueante) ===================
 bool Cinematica::goToIndex(uint8_t idx) {
   auto it = points_.find(idx);
   if (it == points_.end()) {
-    Serial.println(F("[SCARA] Índice não encontrado no mapa."));
+    Serial.println(F("[SCARA] Índice não encontrado (1..10)."));
     return false;
   }
   return goToXY(it->second.x, it->second.y);
@@ -47,107 +53,148 @@ bool Cinematica::goToIndex(uint8_t idx) {
 bool Cinematica::goToXY(float x_mm, float y_mm) {
   float th1_deg, th2_deg;
   if (!solveIK(x_mm, y_mm, th1_deg, th2_deg)) {
-    Serial.println(F("[SCARA] Ponto fora do alcance ou fora de limites."));
+    Serial.println(F("[SCARA] Ponto fora do alcance/limites."));
     return false;
   }
-
   long target1 = degToSteps(th1_deg);
   long target2 = degToSteps(th2_deg);
 
   Serial.print(F("[SCARA] IK -> th1=")); Serial.print(th1_deg);
   Serial.print(F(" deg, th2=")); Serial.print(th2_deg);
-  Serial.print(F(" deg | steps1=")); Serial.print(target1);
-  Serial.print(F(", steps2=")); Serial.println(target2);
+  Serial.print(F(" deg | s1->")); Serial.print(target1);
+  Serial.print(F(" s2->")); Serial.println(target2);
 
-  // Ordem de movimento: pode alternar, sincronizar, etc. Aqui: 1 depois 2.
-  moveMotor(pos1_steps, target1, STEP1_, DIR1_);
-  moveMotor(pos2_steps, target2, STEP2_, DIR2_);
-
-  return true;
+  return runToBothTargets(target1, target2);
 }
 
-void Cinematica::setPulseTimings(unsigned int us_on, unsigned int us_off) {
-  us_on_  = us_on;
-  us_off_ = us_off;
-}
-
+// =================== AJUSTES ===================
 void Cinematica::setCurrentAnglesDeg(float th1_deg, float th2_deg) {
-  pos1_steps = degToSteps(th1_deg);
-  pos2_steps = degToSteps(th2_deg);
+  pos1_steps_ = degToSteps(th1_deg);
+  pos2_steps_ = degToSteps(th2_deg);
+  if (m1_) m1_->setCurrentPosition(pos1_steps_);
+  if (m2_) m2_->setCurrentPosition(pos2_steps_);
 }
 
+void Cinematica::setMicrostepDivider(uint8_t divider) {
+  microstep_div_ = divider ? divider : 1;
+  step_eff_deg_  = motor_step_deg_ / (float)microstep_div_;
+}
+
+void Cinematica::setPins(int step1, int dir1, int step2, int dir2, int enPin) {
+  STEP1_ = step1; DIR1_ = dir1; STEP2_ = step2; DIR2_ = dir2; EN_ = enPin;
+}
+
+void Cinematica::setGeometry(float L1_mm, float L2_mm) {
+  L1_ = L1_mm; L2_ = L2_mm;
+}
+
+void Cinematica::setLimits(float th1_min, float th1_max, float th2_min, float th2_max) {
+  th1_min_ = th1_min; th1_max_ = th1_max;
+  th2_min_ = th2_min; th2_max_ = th2_max;
+}
+
+void Cinematica::setMotorStep(float motor_step_deg) {
+  motor_step_deg_ = motor_step_deg;
+  step_eff_deg_   = motor_step_deg_ / (float)microstep_div_;
+}
+
+void Cinematica::setMapPoint(uint8_t idx, float x_mm, float y_mm) {
+  if (idx < 1 || idx > 10) return;
+  points_[idx] = {x_mm, y_mm};
+}
+
+void Cinematica::setMaxSpeed(float steps_per_s) {
+  max_speed_ = steps_per_s;
+  if (m1_) m1_->setMaxSpeed(max_speed_);
+  if (m2_) m2_->setMaxSpeed(max_speed_);
+}
+
+void Cinematica::setAcceleration(float steps_per_s2) {
+  accel_ = steps_per_s2;
+  if (m1_) m1_->setAcceleration(accel_);
+  if (m2_) m2_->setAcceleration(accel_);
+}
+
+void Cinematica::invertDir(bool joint1_invert, bool joint2_invert) {
+  inv_dir1_ = joint1_invert;
+  inv_dir2_ = joint2_invert;
+  if (m1_) m1_->setPinsInverted(inv_dir1_, false, false);
+  if (m2_) m2_->setPinsInverted(inv_dir2_, false, false);
+}
+
+// =================== INTERNOS ===================
 bool Cinematica::solveIK(float x, float y, float& th1_deg_out, float& th2_deg_out) {
-  // Fórmula clássica de 2R:
-  // D = (x^2 + y^2 - L1^2 - L2^2)/(2 L1 L2)
   float r2 = x*x + y*y;
-  float num = r2 - L1_*L1_ - L2_*L2_;
-  float den = 2.0f * L1_ * L2_;
-  float D = num / den;
+  float D = (r2 - L1_*L1_ - L2_*L2_) / (2.0f * L1_ * L2_);
+  if (fabsf(D) > 1.0f) return false;
 
-  if (fabsf(D) > 1.0f) return false; // inalcançável
+  float t2_up = atan2f( sqrtf(1.0f - D*D), D );
+  float t2_dn = atan2f(-sqrtf(1.0f - D*D), D );
 
-  float theta2_up = atan2f( sqrtf(1.0f - D*D), D );
-  float theta2_dn = atan2f(-sqrtf(1.0f - D*D), D );
-
-  // theta1 = atan2(y,x) - atan2(L2*sin(theta2), L1 + L2*cos(theta2))
-  auto th1_from_th2 = [&](float t2) {
+  auto th1_from_t2 = [&](float t2){
     return atan2f(y, x) - atan2f(L2_ * sinf(t2), L1_ + L2_ * cosf(t2));
   };
 
-  float th1_up = th1_from_th2(theta2_up);
-  float th1_dn = th1_from_th2(theta2_dn);
+  float t1_up = th1_from_t2(t2_up);
+  float t1_dn = th1_from_t2(t2_dn);
 
-  // rad -> deg
-  float th1_up_deg = th1_up * 180.0f / PI;
-  float th2_up_deg = theta2_up * 180.0f / PI;
-  float th1_dn_deg = th1_dn * 180.0f / PI;
-  float th2_dn_deg = theta2_dn * 180.0f / PI;
+  float t1_up_d = t1_up * 180.0f/PI, t2_up_d = t2_up * 180.0f/PI;
+  float t1_dn_d = t1_dn * 180.0f/PI, t2_dn_d = t2_dn * 180.0f/PI;
 
-  bool valid_up = inRange(th1_up_deg, th1_min_, th1_max_) &&
-                  inRange(th2_up_deg, th2_min_, th2_max_);
-  bool valid_dn = inRange(th1_dn_deg, th1_min_, th1_max_) &&
-                  inRange(th2_dn_deg, th2_min_, th2_max_);
+  bool up_ok = inRange(t1_up_d, th1_min_, th1_max_) && inRange(t2_up_d, th2_min_, th2_max_);
+  bool dn_ok = inRange(t1_dn_d, th1_min_, th1_max_) && inRange(t2_dn_d, th2_min_, th2_max_);
+  if (!up_ok && !dn_ok) return false;
 
-  if (!valid_up && !valid_dn) return false;
+  float cur1 = pos1_steps_ * step_eff_deg_;
+  float cur2 = pos2_steps_ * step_eff_deg_;
+  float d_up = fabsf(t1_up_d - cur1) + fabsf(t2_up_d - cur2);
+  float d_dn = fabsf(t1_dn_d - cur1) + fabsf(t2_dn_d - cur2);
 
-  // Escolhe solução mais próxima da posição atual (em graus)
-  float cur1_deg = pos1_steps * step_eff_deg_;
-  float cur2_deg = pos2_steps * step_eff_deg_;
-
-  float dist_up = fabsf(th1_up_deg - cur1_deg) + fabsf(th2_up_deg - cur2_deg);
-  float dist_dn = fabsf(th1_dn_deg - cur1_deg) + fabsf(th2_dn_deg - cur2_deg);
-
-  if (valid_up && (!valid_dn || dist_up <= dist_dn)) {
-    th1_deg_out = th1_up_deg;
-    th2_deg_out = th2_up_deg;
-  } else {
-    th1_deg_out = th1_dn_deg;
-    th2_deg_out = th2_dn_deg;
-  }
+  if (up_ok && (!dn_ok || d_up <= d_dn)) { th1_deg_out = t1_up_d; th2_deg_out = t2_up_d; }
+  else                                   { th1_deg_out = t1_dn_d; th2_deg_out = t2_dn_d; }
 
   return true;
 }
 
 long Cinematica::degToSteps(float deg) const {
-  // arredonda para o passo mais próximo
   return lroundf(deg / step_eff_deg_);
 }
 
-void Cinematica::moveMotor(long& currentPos, long targetPos, int STEP_PIN, int DIR_PIN) {
-  long delta = targetPos - currentPos;
-  int dir = (delta >= 0) ? HIGH : LOW;
-  digitalWrite(DIR_PIN, dir);
+bool Cinematica::runToBothTargets(long target1, long target2) {
+  if (!m1_ || !m2_) return false;
 
-  long steps = labs(delta);
-  for (long i = 0; i < steps; ++i) {
-    digitalWrite(STEP_PIN, HIGH);
-    delayMicroseconds(us_on_);
-    digitalWrite(STEP_PIN, LOW);
-    delayMicroseconds(us_off_);
+  // Prepara direção (garante DIR estável antes dos pulsos STEP)
+  delayMicroseconds(DEF_DIR_SETUP_US);
+
+  m1_->moveTo(target1);
+  m2_->moveTo(target2);
+
+  // Loop bloqueante: acelera, move e desacelera ambos até chegar
+  while ( (m1_->distanceToGo() != 0) || (m2_->distanceToGo() != 0) ) {
+    m1_->run();
+    m2_->run();
   }
-  currentPos = targetPos;
+
+  // Atualiza nosso estado discreto (caso o AccelStepper arredonde diferente)
+  pos1_steps_ = m1_->currentPosition();
+  pos2_steps_ = m2_->currentPosition();
+  return true;
 }
 
 bool Cinematica::inRange(float v, float vmin, float vmax) {
   return (v >= vmin) && (v <= vmax);
+}
+
+void Cinematica::loadDefaultPoints() {
+  points_.clear();
+  points_[1]  = { 300.0f,     0.0f };
+  points_[2]  = { 320.0f,   -50.0f };
+  points_[3]  = { 280.0f,    80.0f };
+  points_[4]  = { 250.0f,  -120.0f };
+  points_[5]  = { 350.0f,    30.0f };
+  points_[6]  = { 200.0f,   150.0f };
+  points_[7]  = { 200.0f,  -150.0f };
+  points_[8]  = { 380.0f,   -10.0f };
+  points_[9]  = { 260.0f,    40.0f };
+  points_[10] = { 385.95f, -183.37f };
 }

@@ -1,26 +1,35 @@
 #include "Garra.h"
 
-void Garra::begin() {
-   servo.attach(pinControlServo_1);
+void Garra::begin(int pinControl, int pinTrig, int pinEcho) {
+   servo.attach(pinControl);
    servo.write(0);
+   ultrasonic = Ultrasonic(pinTrig, pinEcho);
 }
 
-void Garra::abrir()
+void Garra::abrir(bool enable)
 {
-   servo.write(angleOpen);
+   if (enable) {
+       servo.write(angleOpen);
+   }
 }
-void Garra::fechar()
+void Garra::fechar(bool enable)
 {
-   servo.write(angleClose);
+   if (enable) {
+       servo.write(angleClose);
+   }
 }
-void Garra::subir()
+void Garra::subir(bool enable)
 {
-   servo.write(angleUp);
+   if (enable) {
+       servo.write(angleUp);
+   }
 }
 
-void Garra::descer()
+void Garra::descer(bool enable)
 {
-   servo.write(angleDown);
+   if (enable) {
+       servo.write(angleDown);
+   }
 }
 
 float Garra::distancia()

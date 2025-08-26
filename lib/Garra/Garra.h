@@ -15,18 +15,18 @@
 
 class Garra {
 public:
-    void begin();
-    void abrir();
-    void fechar();
-    void subir();
-    void descer();
+    void begin(int pinControl, int pinTrig, int pinEcho);
+    void abrir(bool enable);
+    void fechar(bool enable);
+    void subir(bool enable);
+    void descer(bool enable);
     float distancia();
 
 private:
     Servo servo;
-    Ultrasonic ultrasonic = Ultrasonic(pinTRIG, pinECHO);
     float _distancia;
     long microseg;
+    Ultrasonic ultrasonic = Ultrasonic(0, 0);
 };
 
 #endif

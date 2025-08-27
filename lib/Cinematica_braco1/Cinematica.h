@@ -18,8 +18,8 @@ public:
   static constexpr uint8_t DEF_MICROSTEP_DIV  = 16; 
   static constexpr unsigned int DEF_DIR_SETUP_US = 2;
 
-  static constexpr float DEF_MAX_SPEED_STEPS_S = 500.0f;
-  static constexpr float DEF_ACCEL_STEPS_S2    = 200.0f;
+  static constexpr float DEF_MAX_SPEED_STEPS_S = 250.0f;
+  static constexpr float DEF_ACCEL_STEPS_S2    = 100.0f;
 
   Cinematica(int step1, int dir1, int step2, int dir2, int enPin = -1);
 

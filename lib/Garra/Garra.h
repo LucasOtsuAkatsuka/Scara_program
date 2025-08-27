@@ -3,7 +3,6 @@
 
 #define pinECHO 11
 #define pinTRIG 13
-#define pinControlServo_1 5
 #define angleOpen 90
 #define angleClose 0
 #define angleUp 180

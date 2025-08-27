@@ -10,18 +10,21 @@ void Garra::abrir(bool enable)
 {
    if (enable) {
        servo.write(angleOpen);
+       Serial.println("abrir garra");
    }
 }
 void Garra::fechar(bool enable)
 {
    if (enable) {
        servo.write(angleClose);
+       Serial.println("fechar garra");
    }
 }
 void Garra::subir(bool enable)
 {
    if (enable) {
        servo.write(angleUp);
+       Serial.println("subir garra");
    }
 }
 
@@ -29,6 +32,7 @@ void Garra::descer(bool enable)
 {
    if (enable) {
        servo.write(angleDown);
+       Serial.println("descer garra");
    }
 }
 

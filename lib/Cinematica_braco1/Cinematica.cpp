@@ -132,8 +132,14 @@ bool Cinematica::runToBothTargets(long target1, long target2) {
   while ( (m1_->distanceToGo() != 0) || (m2_->distanceToGo() != 0) ) {
     m1_->run();
     m2_->run();
+    Serial.println(m1_->distanceToGo());
+    Serial.println(m2_->distanceToGo());
   }
 
+  Serial.println("Deslocamento concluido");
+  Serial.print(m1_->currentPosition());
+  Serial.print(F(", "));
+  Serial.println(m2_->currentPosition());
   // Atualiza nosso estado discreto (caso o AccelStepper arredonde diferente)
   pos1_steps_ = m1_->currentPosition();
   pos2_steps_ = m2_->currentPosition();
